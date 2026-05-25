@@ -367,6 +367,128 @@
 
   .howto-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+  /* ─── Trainer edit controls ─── */
+  .trainer-icon-btn {
+    background: rgba(255,102,68,0.12);
+    border: 1px solid rgba(255,102,68,0.4);
+    color: #ff6644;
+    font-size: 0.65rem;
+    line-height: 1;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    margin-left: 0.4rem;
+  }
+  .trainer-icon-btn:hover { background: rgba(255,102,68,0.25); }
+  .trainer-icon-btn.del { background: rgba(255,68,68,0.12); border-color: rgba(255,68,68,0.4); color: #ff4444; }
+  .trainer-icon-btn.del:hover { background: rgba(255,68,68,0.25); }
+
+  .trainer-add-row {
+    text-align: center;
+    padding: 0.75rem 0;
+    border-top: 1px dashed rgba(255,102,68,0.25);
+  }
+  .trainer-add-btn, .trainer-reset-btn {
+    background: transparent;
+    border: 1px dashed rgba(255,102,68,0.5);
+    color: #ff6644;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 0 0.3rem;
+  }
+  .trainer-add-btn:hover, .trainer-reset-btn:hover {
+    background: rgba(255,102,68,0.1);
+    border-style: solid;
+  }
+  .trainer-edited-badge {
+    display: inline-block;
+    background: rgba(255,102,68,0.18);
+    color: #ff6644;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+  }
+
+  /* ─── Edit modal ─── */
+  .edit-modal-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 0.6rem 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  .edit-modal-grid label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .edit-modal-grid input, .edit-modal-grid select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.55rem 0.75rem;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+  }
+  .edit-modal-grid input:focus { outline: none; border-color: var(--accent); }
+
+  .edit-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  .edit-modal-save, .edit-modal-cancel {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    padding: 0.7rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .edit-modal-save {
+    background: var(--accent);
+    color: #000;
+    border: none;
+  }
+  .edit-modal-cancel {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .sync-indicator {
+    position: fixed;
+    bottom: 60px;
+    right: 14px;
+    background: rgba(0,0,0,0.7);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    z-index: 9000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .sync-indicator.show { opacity: 1; }
+  .sync-indicator.ok { color: var(--accent3); }
+  .sync-indicator.err { color: #ff4444; }
+
   .modal-overlay {
     display: none;
     position: fixed; inset: 0;
@@ -956,6 +1078,29 @@
   </div>
 </div>
 
+<!-- EDIT MODAL (trainer mode) -->
+<div class="modal-overlay" id="edit-modal-overlay" onclick="closeEditModal(event)">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" onclick="cancelEdit()">✕</button>
+    <div class="modal-title" id="edit-modal-title">Edit Exercise</div>
+    <div class="edit-modal-grid">
+      <label for="ed-name">Name</label>          <input id="ed-name" type="text" />
+      <label for="ed-sets">Sets</label>          <input id="ed-sets" type="text" />
+      <label for="ed-reps">Reps</label>          <input id="ed-reps" type="text" />
+      <label for="ed-weight">Weight</label>      <input id="ed-weight" type="text" />
+      <label for="ed-rest">Rest</label>          <input id="ed-rest" type="text" />
+      <label for="ed-rpe">RPE</label>            <input id="ed-rpe" type="text" />
+    </div>
+    <div class="edit-modal-actions">
+      <button class="edit-modal-cancel" onclick="cancelEdit()">Cancel</button>
+      <button class="edit-modal-save" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync indicator -->
+<div class="sync-indicator" id="sync-indicator"></div>
+
 <script>
 // ─── DATA ───────────────────────────────────────────────────────────────────
 
@@ -1312,17 +1457,267 @@ function getRpeClass(rpe) {
   return 'rpe-9';
 }
 
+// ╔═════════════════════════════════════════════════════════════════════════╗
+// ║  OVERRIDES ENGINE — trainer can edit/add/delete exercises; persists in  ║
+// ║  localStorage and (if configured) syncs to a Google Sheets webhook so   ║
+// ║  the changes appear on the client's device too.                         ║
+// ║  NOTE: this script block runs BEFORE CLIENT_CONFIG is defined, so all   ║
+// ║  references to CLIENT_CONFIG live inside functions (lazy access).       ║
+// ╚═════════════════════════════════════════════════════════════════════════╝
+function _lsOverridesKey() {
+  return CLIENT_CONFIG.client.storageKey + '_overrides';
+}
+
+function loadOverrides() {
+  try { return JSON.parse(localStorage.getItem(_lsOverridesKey()) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function saveOverridesLocal(o) {
+  localStorage.setItem(_lsOverridesKey(), JSON.stringify(o));
+}
+
+function showSyncMsg(text, cls) {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'sync-indicator show ' + (cls || '');
+  clearTimeout(window._syncTimeout);
+  window._syncTimeout = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function postOverride(dayKey, exercises) {
+  if (!CLIENT_CONFIG.sheetsWebhookUrl) return;
+  fetch(CLIENT_CONFIG.sheetsWebhookUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      client: CLIENT_CONFIG.client.storageKey,
+      dayKey: dayKey,
+      exercises: exercises,
+      timestamp: new Date().toISOString()
+    })
+  }).then(() => showSyncMsg('✓ synced', 'ok'))
+    .catch(e => { console.warn('Sync POST failed:', e); showSyncMsg('✗ sync failed', 'err'); });
+}
+
+async function pullOverrides() {
+  if (!CLIENT_CONFIG.sheetsWebhookUrl) return;
+  try {
+    const url = CLIENT_CONFIG.sheetsWebhookUrl
+              + (CLIENT_CONFIG.sheetsWebhookUrl.includes('?') ? '&' : '?')
+              + 'client=' + encodeURIComponent(CLIENT_CONFIG.client.storageKey)
+              + '&_=' + Date.now();
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data && typeof data === 'object') {
+      saveOverridesLocal(data);
+      // Re-render training view if visible
+      const trainingSection = document.getElementById('section-training');
+      if (trainingSection && trainingSection.classList.contains('active') && typeof renderDay === 'function') {
+        renderDay();
+      }
+      showSyncMsg('✓ pulled latest', 'ok');
+    }
+  } catch(e) {
+    console.warn('Pull failed:', e);
+    // Silent fail on initial load — cloud may not be configured yet
+  }
+}
+
+function getDayExercises(phaseN, dayIdx) {
+  const o = loadOverrides();
+  const key = 'p' + phaseN + '.d' + dayIdx;
+  if (o[key] && Array.isArray(o[key])) return o[key];
+  return phases[phaseN].days[dayIdx].exercises;
+}
+
+function isDayOverridden(phaseN, dayIdx) {
+  const o = loadOverrides();
+  return !!o['p' + phaseN + '.d' + dayIdx];
+}
+
+function setDayExercises(phaseN, dayIdx, exercises) {
+  const o = loadOverrides();
+  const key = 'p' + phaseN + '.d' + dayIdx;
+  o[key] = exercises;
+  saveOverridesLocal(o);
+  postOverride(key, exercises);
+}
+
+function resetDay(phaseN, dayIdx) {
+  if (!confirm('Reset this day to the default plan? Any custom changes will be lost.')) return;
+  const o = loadOverrides();
+  const key = 'p' + phaseN + '.d' + dayIdx;
+  delete o[key];
+  saveOverridesLocal(o);
+  postOverride(key, null); // null = reset
+  renderDay();
+}
+
+// ─── Edit UI ───
+let _editingIdx = -1;
+let _editingIsNew = false;
+
+function editExercise(idx) {
+  const ex = getDayExercises(currentPhase, currentDay)[idx];
+  if (!ex) return;
+  _editingIdx = idx;
+  _editingIsNew = false;
+  document.getElementById('edit-modal-title').textContent = 'Edit Exercise';
+  document.getElementById('ed-name').value   = ex.name || '';
+  document.getElementById('ed-sets').value   = ex.sets || '';
+  document.getElementById('ed-reps').value   = ex.reps || '';
+  document.getElementById('ed-weight').value = ex.weight || '';
+  document.getElementById('ed-rest').value   = ex.rest || '';
+  document.getElementById('ed-rpe').value    = ex.rpe || '';
+  document.getElementById('edit-modal-overlay').classList.add('open');
+}
+
+function addExercise() {
+  _editingIdx = -1;
+  _editingIsNew = true;
+  document.getElementById('edit-modal-title').textContent = 'Add Exercise';
+  document.getElementById('ed-name').value   = '';
+  document.getElementById('ed-sets').value   = '3';
+  document.getElementById('ed-reps').value   = '8';
+  document.getElementById('ed-weight').value = '';
+  document.getElementById('ed-rest').value   = '90s';
+  document.getElementById('ed-rpe').value    = '7';
+  document.getElementById('edit-modal-overlay').classList.add('open');
+}
+
+function cancelEdit() {
+  document.getElementById('edit-modal-overlay').classList.remove('open');
+}
+
+function closeEditModal(e) {
+  if (e.target === document.getElementById('edit-modal-overlay')) cancelEdit();
+}
+
+function saveEdit() {
+  const newEx = {
+    name:   document.getElementById('ed-name').value.trim(),
+    sets:   document.getElementById('ed-sets').value.trim(),
+    reps:   document.getElementById('ed-reps').value.trim(),
+    weight: document.getElementById('ed-weight').value.trim(),
+    rest:   document.getElementById('ed-rest').value.trim(),
+    rpe:    document.getElementById('ed-rpe').value.trim(),
+  };
+  if (!newEx.name) { alert('Name is required.'); return; }
+
+  const exercises = getDayExercises(currentPhase, currentDay).map(e => ({...e}));
+  let oldWeight = null, exName = newEx.name;
+
+  if (_editingIsNew) {
+    exercises.push(newEx);
+  } else {
+    oldWeight = exercises[_editingIdx].weight;
+    exName    = exercises[_editingIdx].name;
+    exercises[_editingIdx] = newEx;
+  }
+
+  setDayExercises(currentPhase, currentDay, exercises);
+  cancelEdit();
+  renderDay();
+
+  // Apply Forward — only when weight changed on an existing row
+  if (!_editingIsNew && oldWeight !== newEx.weight && oldWeight && newEx.weight) {
+    promptApplyForward(newEx.name, oldWeight, newEx.weight);
+  }
+}
+
+function deleteExercise(idx) {
+  const exs = getDayExercises(currentPhase, currentDay);
+  const exName = exs[idx] ? exs[idx].name : 'this exercise';
+  if (!confirm('Delete "' + exName + '" from this day?')) return;
+  const newExs = exs.filter((_, i) => i !== idx);
+  setDayExercises(currentPhase, currentDay, newExs);
+  renderDay();
+}
+
+// ─── Apply Forward ───
+function _parseWeight(w) {
+  // Handles: "85kg", "BW + 5kg", "BW+10kg", "Assist -25", numbers
+  const m = String(w).match(/(-?\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+function _replaceWeight(w, newNum) {
+  // Replaces the first number in the weight string
+  return String(w).replace(/-?\d+(?:\.\d+)?/, String(newNum));
+}
+
+function promptApplyForward(exName, oldW, newW) {
+  const oldNum = _parseWeight(oldW);
+  const newNum = _parseWeight(newW);
+  if (oldNum == null || newNum == null) return;
+  const diff = newNum - oldNum;
+  if (diff === 0) return;
+
+  const matches = [];
+  for (let p = 1; p <= 3; p++) {
+    for (let d = 0; d < phases[p].days.length; d++) {
+      if (p === currentPhase && d === currentDay) continue;
+      const exs = getDayExercises(p, d);
+      exs.forEach((e, i) => {
+        if (e.name === exName) {
+          const eOld = _parseWeight(e.weight);
+          if (eOld != null) {
+            const eNew = _replaceWeight(e.weight, +(eOld + diff).toFixed(2));
+            matches.push({ p, d, i, oldW: e.weight, newW: eNew });
+          }
+        }
+      });
+    }
+  }
+
+  if (matches.length === 0) return;
+  const sign = diff > 0 ? '+' : '';
+  const msg = 'Also apply ' + sign + diff + 'kg to "' + exName + '" in ' + matches.length + ' other day(s)?\n\n' +
+              matches.slice(0, 8).map(m =>
+                '  Phase ' + m.p + ' Day ' + (m.d + 1) + ': ' + m.oldW + ' → ' + m.newW
+              ).join('\n') +
+              (matches.length > 8 ? '\n  ... and ' + (matches.length - 8) + ' more' : '');
+
+  if (!confirm(msg)) return;
+
+  matches.forEach(m => {
+    const exs = getDayExercises(m.p, m.d).map(e => ({...e}));
+    exs[m.i].weight = m.newW;
+    setDayExercises(m.p, m.d, exs);
+  });
+  alert('✓ Applied to ' + matches.length + ' day(s). Reload the page on the client device to pull the changes.');
+}
+
+// ─── renderDay (override-aware) ───
+// Defensive isTrainerMode call: the trainer JS block declares LS_TRAINER_KEY
+// LATER in the file (after the init block runs renderTraining() → renderDay()),
+// so a direct call would hit the Temporal Dead Zone on first render. Wrap in
+// try/catch so initial render works; re-render after trainer login picks it up.
+function _safeIsTrainerMode() {
+  try { return (typeof isTrainerMode === 'function') && isTrainerMode(); }
+  catch(e) { return false; }
+}
+
 function renderDay() {
   const p = phases[currentPhase];
   const day = p.days[currentDay];
-  const isPhase1 = currentPhase === 1;
+  const exercises = getDayExercises(currentPhase, currentDay);
+  const trainer = _safeIsTrainerMode();
+  const edited = isDayOverridden(currentPhase, currentDay);
 
-  const rows = day.exercises.map(ex => {
+  const rows = exercises.map((ex, i) => {
     const hasHowTo = howTos[ex.name];
     const btn = hasHowTo ? `<button class="howto-btn" onclick="openModal('${ex.name.replace(/'/g,"\\'")}')">HOW TO</button>` : '';
+    const edBtns = trainer
+      ? `<button class="trainer-icon-btn" onclick="editExercise(${i})" title="Edit">✏️ EDIT</button>
+         <button class="trainer-icon-btn del" onclick="deleteExercise(${i})" title="Delete">✕</button>`
+      : '';
     return `
       <tr>
-        <td class="ex-name">${ex.name}${isPhase1 ? btn : btn}</td>
+        <td class="ex-name">${ex.name}${btn}${edBtns}</td>
         <td class="ex-sets">${ex.sets}</td>
         <td class="ex-reps">${ex.reps}</td>
         <td class="ex-weight">${ex.weight}</td>
@@ -1331,6 +1726,15 @@ function renderDay() {
       </tr>
     `;
   }).join('');
+
+  const trainerFooter = trainer
+    ? `<div class="trainer-add-row">
+         <button class="trainer-add-btn" onclick="addExercise()">+ Add Exercise</button>
+         ${edited ? `<button class="trainer-reset-btn" onclick="resetDay(${currentPhase},${currentDay})">↶ Reset Day to Default</button>` : ''}
+       </div>`
+    : '';
+
+  const editedBadge = edited ? `<span class="trainer-edited-badge">EDITED</span>` : '';
 
   const progRows = p.progression.map((row, i) => {
     if (i === 0) return `<tr>${row.map(h => `<th>${h}</th>`).join('')}</tr>`;
@@ -1341,6 +1745,7 @@ function renderDay() {
     <div class="workout-day-title">
       ${day.label}
       <span class="day-badge">${day.badge}</span>
+      ${editedBadge}
     </div>
     <div class="workout-table-wrap">
       <table>
@@ -1356,6 +1761,7 @@ function renderDay() {
         </thead>
         <tbody>${rows}</tbody>
       </table>
+      ${trainerFooter}
     </div>
   `;
 
@@ -1906,6 +2312,10 @@ initLockState();
 renderTraining();
 renderNutrition();
 
+// Pull any cloud-synced trainer overrides on boot (silent fail if no webhook).
+// pullOverrides() will re-render training automatically if updates were found.
+if (typeof pullOverrides === 'function') pullOverrides();
+
 // ─── TRAINER OVERRIDE ────────────────────────────────────────────────────
 // Knowing CLIENT_CONFIG.trainerPassword lets the trainer unlock all phases
 // regardless of the per-phase codes or unlock timer. The state persists in
@@ -1928,7 +2338,9 @@ function trainerLogin(){
     const c2=document.getElementById('cardio-card-p2');if(c2){c2.style.filter='';c2.style.pointerEvents='';c2.style.userSelect='';}
     const c3=document.getElementById('cardio-card-p3');if(c3){c3.style.filter='';c3.style.pointerEvents='';c3.style.userSelect='';}
     const cu=document.getElementById('cardio-unlock-notice');if(cu)cu.style.display='none';
-    alert('✓ Trainer mode active — Phase 2 + Phase 3 unlocked.');
+    // Re-render the day so edit/add/delete buttons appear
+    if (typeof renderDay === 'function') renderDay();
+    alert('✓ Trainer mode active — Phase 2 + Phase 3 unlocked.\n\nEdit/Add/Delete buttons are now visible on each exercise.\nChanges save instantly and sync to the client device if the webhook is configured.');
   } else {
     alert('Wrong password.');
   }
@@ -1991,64 +2403,6 @@ if(isTrainerMode()){
 // ─── END TRAINER OVERRIDE ────────────────────────────────────────────────
 
 renderCheckins();
-</script>
-
-<script>
-// ─── TRAINER OVERRIDE ────────────────────────────────────────────────────
-const _LS_TRAINER = CLIENT_CONFIG.client.storageKey + '_trainer_mode';
-function isTrainerMode(){return localStorage.getItem(_LS_TRAINER)==='1';}
-function trainerLogin(){
-  const pw = prompt('Trainer password — leave blank to cancel:');
-  if(pw===null||pw==='')return;
-  if(pw === CLIENT_CONFIG.trainerPassword){
-    setUnlocked(2); setUnlocked(3);
-    localStorage.setItem(_LS_TRAINER,'1');
-    showTrainerBadge();
-    const t2=document.getElementById('tab-phase-2'); if(t2)t2.textContent='Phase 2 — '+phases[2].label+' ✓';
-    const t3=document.getElementById('tab-phase-3'); if(t3)t3.textContent='Phase 3 — '+phases[3].label+' ✓';
-    const c2=document.getElementById('cardio-card-p2');if(c2){c2.style.filter='';c2.style.pointerEvents='';c2.style.userSelect='';}
-    const c3=document.getElementById('cardio-card-p3');if(c3){c3.style.filter='';c3.style.pointerEvents='';c3.style.userSelect='';}
-    const cu=document.getElementById('cardio-unlock-notice');if(cu)cu.style.display='none';
-    alert('✓ Trainer mode active — Phase 2 + Phase 3 unlocked.');
-  } else { alert('Wrong password.'); }
-}
-function trainerLogout(){
-  if(!confirm('Exit trainer mode? Phases will re-lock.'))return;
-  localStorage.removeItem(_LS_TRAINER);
-  localStorage.removeItem(LS_KEYS.unlocked);
-  location.reload();
-}
-function showTrainerBadge(){
-  if(document.getElementById('trainer-badge'))return;
-  const b=document.createElement('div');
-  b.id='trainer-badge';
-  b.innerHTML='⚙ TRAINER MODE · <a href="javascript:trainerLogout()" style="color:#fff;text-decoration:underline">exit</a>';
-  b.style.cssText='position:fixed;top:10px;right:10px;background:#ff6644;color:#fff;font-family:DM Mono,monospace;font-size:0.65rem;letter-spacing:0.1em;padding:0.4rem 0.8rem;border-radius:4px;z-index:9999;';
-  document.body.appendChild(b);
-}
-let _bt=[];
-document.addEventListener('keydown',function(e){
-  if(e.key==='`'){
-    const now=Date.now();
-    _bt=_bt.filter(t=>now-t<1500);
-    _bt.push(now);
-    if(_bt.length>=3){_bt=[];trainerLogin();}
-  }
-});
-window.addEventListener('load',function(){
-  if(location.hash==='#trainer'){history.replaceState(null,'',location.pathname);trainerLogin();}
-  if(document.getElementById('trainer-btn'))return;
-  const b=document.createElement('button');
-  b.id='trainer-btn';
-  b.textContent='🔒 trainer';
-  b.title='Trainer access (or press ` three times)';
-  b.onclick=trainerLogin;
-  b.style.cssText='position:fixed;bottom:14px;right:14px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--muted);font-family:DM Mono,monospace;font-size:0.65rem;letter-spacing:0.08em;padding:0.4rem 0.7rem;border-radius:6px;opacity:0.55;cursor:pointer;z-index:9000;';
-  b.onmouseenter=()=>b.style.opacity='1';
-  b.onmouseleave=()=>b.style.opacity='0.55';
-  document.body.appendChild(b);
-});
-if(isTrainerMode()){setUnlocked(2);setUnlocked(3);window.addEventListener('load',showTrainerBadge);}
 </script>
 </body>
 </html>
