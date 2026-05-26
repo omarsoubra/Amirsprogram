@@ -1769,15 +1769,53 @@ function _findProgressionRow(prog, exName) {
   }
   return -1;
 }
+function _shiftWeightStr(weightStr, delta) {
+  // Bump the numeric portion of a weight string by `delta`. Leaves non-numeric
+  // strings (e.g. "BW", "Med band") untouched so they don't get corrupted.
+  const num = _parseWeight(weightStr);
+  if (num == null) return weightStr;
+  const newNum = +(num + delta).toFixed(2);
+  return _replaceWeight(weightStr, newNum);
+}
 function _syncProgressionFromExercise(phaseN, exName, newWeight) {
-  // When a trainer changes an exercise's weight, also reflect that in the
-  // progression table's Week 1 cell for the same exercise. The remaining
-  // week cells stay as the existing progression curve.
+  // When a trainer changes an exercise's weight on the daily view, set
+  // progression Week 1 to the new value AND shift Weeks 2-N by the same
+  // delta so the natural progression curve carries forward. Example:
+  //   Old prog row: 80kg → 85kg → 90kg → 95kg, change Week 1 to 90kg
+  //   New prog row: 90kg → 95kg → 100kg → 105kg  (each shifted +10kg)
   const prog = getProgression(phaseN).map(r => [...r]);
   const rowIdx = _findProgressionRow(prog, exName);
-  if (rowIdx > 0) {
+  if (rowIdx <= 0) return;
+  const oldW1 = prog[rowIdx][1];
+  const oldNum = _parseWeight(oldW1);
+  const newNum = _parseWeight(newWeight);
+  if (oldNum != null && newNum != null) {
+    const delta = newNum - oldNum;
+    // Shift every numeric week cell by the same delta
+    for (let c = 1; c < prog[rowIdx].length; c++) {
+      prog[rowIdx][c] = _shiftWeightStr(prog[rowIdx][c], delta);
+    }
+  } else {
+    // Old or new weight wasn't a number — just replace Week 1
     prog[rowIdx][1] = newWeight;
-    setProgression(phaseN, prog);
+  }
+  setProgression(phaseN, prog);
+}
+function _syncDaysFromProgressionWeek1(phaseN, exName, newWeight) {
+  // When a trainer edits the Week 1 cell of the progression table, also
+  // update any day-view exercise rows with that exercise name. Searches all
+  // days in the phase so it works no matter which day has the exercise.
+  const days = phases[phaseN] && phases[phaseN].days ? phases[phaseN].days : [];
+  for (let d = 0; d < days.length; d++) {
+    const exs = getDayExercises(phaseN, d).map(e => ({ ...e }));
+    let touched = false;
+    for (let i = 0; i < exs.length; i++) {
+      if (exs[i].name === exName) {
+        exs[i].weight = newWeight;
+        touched = true;
+      }
+    }
+    if (touched) setDayExercises(phaseN, d, exs);
   }
 }
 function _addProgressionRowForExercise(phaseN, exName, weight) {
@@ -1805,8 +1843,34 @@ function editProgressionCell(phaseN, rowIdx, colIdx) {
   const label = rowIdx === 0 ? 'header (column name)' : (prog[rowIdx][0] + ' — ' + prog[0][colIdx]);
   const newVal = prompt('Edit ' + label + ':', current);
   if (newVal === null || newVal === current) return;
+
   const newProg = prog.map(r => [...r]);
   newProg[rowIdx][colIdx] = newVal;
+
+  // Two-way sync logic (only for data rows, not the header)
+  if (rowIdx > 0 && colIdx > 0) {
+    const oldNum = _parseWeight(current);
+    const newNum = _parseWeight(newVal);
+    const exName = newProg[rowIdx][0];
+
+    // (1) Bump every LATER week cell in the same row by the same delta —
+    //     so "Week 2: 85 → 90" also moves Week 3 + Week 4 up by 5.
+    if (oldNum != null && newNum != null) {
+      const delta = newNum - oldNum;
+      if (delta !== 0) {
+        for (let c = colIdx + 1; c < newProg[rowIdx].length; c++) {
+          newProg[rowIdx][c] = _shiftWeightStr(newProg[rowIdx][c], delta);
+        }
+      }
+    }
+
+    // (2) If you edited Week 1, propagate to the day-view exercise weight
+    //     for the same name across all days in this phase.
+    if (colIdx === 1) {
+      _syncDaysFromProgressionWeek1(phaseN, exName, newVal);
+    }
+  }
+
   setProgression(phaseN, newProg);
   renderDay();
 }
@@ -2195,7 +2259,7 @@ function renderDay() {
 
   document.getElementById('progression-content').innerHTML = `
     <div class="section-tag" style="margin-bottom:0.75rem;">Weekly Progression ${progEdited ? '<span class="trainer-edited-badge">EDITED</span>' : ''}</div>
-    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Only increase weight if you hit the top of your rep range with good form.${trainer ? ' <span style="color:#ff6644;">Trainer: click any cell to edit.</span>' : ''}</p>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem;">Only increase weight if you hit the top of your rep range with good form.${trainer ? ' <span style="color:#ff6644;">Trainer: click any cell to edit. Changing a cell bumps every LATER week by the same delta. Editing Week 1 also updates the day-view weight.</span>' : ''}</p>
     <div class="prog-table-wrap">
       <table class="prog-table">
         <tbody>${progRows}</tbody>
