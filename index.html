@@ -451,6 +451,65 @@
   }
   .meal-edit-pencil:hover { background: rgba(255,102,68,0.3); }
 
+  /* ─── Client-side meal logging ─── */
+  .meal-log-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .meal-log-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    padding: 0.3rem 0.7rem;
+    border-radius: 5px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .meal-log-btn:hover { color: var(--text); border-color: var(--accent); }
+  .meal-log-btn.ate-btn:hover  { color: var(--accent3); border-color: rgba(0,229,160,0.6); }
+  .meal-log-btn.swap-btn:hover { color: var(--warn);     border-color: rgba(255,184,74,0.6); }
+  .meal-log-btn.skip-btn:hover { color: var(--danger);   border-color: rgba(255,68,102,0.6); }
+  .meal-log-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .meal-log-status.ate  { background: rgba(0,229,160,0.12); color: var(--accent3); border: 1px solid rgba(0,229,160,0.3); }
+  .meal-log-status.swap { background: rgba(255,184,74,0.12); color: var(--warn);     border: 1px solid rgba(255,184,74,0.3); }
+  .meal-log-status.skip { background: rgba(255,68,102,0.12); color: var(--danger);   border: 1px solid rgba(255,68,102,0.3); }
+  .meal-log-status .undo {
+    margin-left: 0.4rem;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.6rem;
+  }
+  .meal-log-status .undo:hover { color: var(--text); }
+  .actuals-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin-top: 1rem;
+  }
+  .actuals-card.complete {
+    border-color: rgba(0,229,160,0.5);
+    background: rgba(0,229,160,0.05);
+  }
+
   /* ─── Edit modal ─── */
   .edit-modal-grid {
     display: grid;
@@ -1192,6 +1251,26 @@
   </div>
 </div>
 
+<!-- CLIENT MEAL SWAP MODAL — for "I ate something different" logging -->
+<div class="modal-overlay" id="swap-modal-overlay" onclick="closeSwapModal(event)">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" onclick="cancelSwap()">✕</button>
+    <div class="modal-title" id="swap-modal-title">What did you eat instead?</div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem;">Describe what you ate. If you know the calories/macros, fill them in — otherwise leave blank and just describe.</p>
+    <div class="edit-modal-grid">
+      <label for="sw-desc">What I ate</label>     <input id="sw-desc" type="text" placeholder="e.g. Chicken caesar wrap from work" />
+      <label for="sw-cal">Calories</label>        <input id="sw-cal" type="number" min="0" placeholder="optional" />
+      <label for="sw-p">Protein (g)</label>       <input id="sw-p" type="number" min="0" placeholder="optional" />
+      <label for="sw-c">Carbs (g)</label>         <input id="sw-c" type="number" min="0" placeholder="optional" />
+      <label for="sw-f">Fat (g)</label>           <input id="sw-f" type="number" min="0" placeholder="optional" />
+    </div>
+    <div class="edit-modal-actions">
+      <button class="edit-modal-cancel" onclick="cancelSwap()">Cancel</button>
+      <button class="edit-modal-save" onclick="saveSwap()">Log it</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sync indicator (transient flash on each sync) -->
 <div class="sync-indicator" id="sync-indicator"></div>
 
@@ -1272,7 +1351,12 @@ const howTos = {
   "DB Bent-Over Row": "Stand holding a dumbbell in each hand. Hinge at your hips (push them back) until your torso is ~45° from horizontal, back flat, knees slightly bent. Let arms hang straight down with palms facing your body. Row both dumbbells up to your hip/lower-rib area by driving your elbows back — squeeze your shoulder blades together at the top. Lower slowly. Keep your torso position fixed throughout — don't stand up to lift the weight.",
   "DB Bicep Curl": "Stand with a dumbbell in each hand, arms at your sides, palms facing forward (supinated grip). Keep elbows pinned to your sides. Curl both dumbbells up to your shoulders by flexing your biceps — squeeze hard at the top. Lower slowly to a full stretch at the bottom. Don't swing your body or use momentum. Both arms together, or alternate.",
   "DB Floor Fly": "Lie on your back on the floor with a dumbbell in each hand. Press the dumbbells up so they're directly over your chest, palms facing each other, slight bend in the elbows (hold this bend). Open your arms out to the sides in a wide arc, lowering the dumbbells until your elbows touch the floor — feel a big stretch in your chest. Bring the dumbbells back up in the same arc, squeezing your chest hard at the top. Maintain the elbow bend the whole time — this isn't a press.",
-  "Banded Side-Lying Hip Abduction": "Lie on your side, legs stacked. Loop a resistance band around your thighs (just above the knees). Keeping your lower leg bent for stability, lift your top leg straight up against the band's resistance — squeeze the side of your glute (glute medius). Hold briefly at the top. Lower with control. This is gold for the upper outer glute (the 'shelf'). Switch sides each set."
+  "Banded Side-Lying Hip Abduction": "Lie on your side, legs stacked. Loop a resistance band around your thighs (just above the knees). Keeping your lower leg bent for stability, lift your top leg straight up against the band's resistance — squeeze the side of your glute (glute medius). Hold briefly at the top. Lower with control. This is gold for the upper outer glute (the 'shelf'). Switch sides each set.",
+  "Seated Calf Raise": "Sit on the seated calf raise machine with the balls of your feet on the platform, knees bent at 90 degrees with the pad resting on your lower thighs. Drop your heels as low as possible for a full stretch, then press up onto your toes as high as possible — squeeze the calves at the top. Lower slowly. The seated position emphasizes the soleus (the lower-calf muscle), complementing standing calf raises which target the gastrocnemius.",
+  "Smith Shoulder Press": "Set the Smith machine bar at upper-chest height. Sit on an upright bench positioned under the bar. Grip the bar slightly wider than shoulder width with hands stacked over the elbows. Unrack with a small twist of the wrists, then press up until arms are nearly straight — don't fully lock out. Lower the bar to upper chest level with control. The fixed bar path makes this safer for solo training and lets you push closer to failure than DB shoulder press.",
+  "Cable Tricep Overhead Ext": "Set the cable at the lowest position with a rope attachment. Face away from the machine and grab the rope, then step forward and bend at the hips into a slight forward lean. Start with elbows pinned next to your head, arms bent. Extend forward and slightly down — only your forearms move, upper arms stay locked. Squeeze the triceps at full extension. Slowly return to start. The overhead position puts the long head of the tricep on stretch.",
+  "Cable Tricep Pushdown": "Set the cable at the top with a straight bar or V-bar attachment. Stand facing the machine, grip the bar with elbows pinned tight at your sides. Push the bar down by extending your forearms — elbows don't move forward or back. Squeeze the triceps hard at the bottom. Control the weight back up to chest level. Don't let your shoulders shrug up — keep them down and back the whole time.",
+  "Ab Crunch Machine": "Sit on the ab crunch machine and grip the handles at chest/head level. Brace your core and crunch forward by contracting your abs — round your spine, bring your ribs toward your hips. Squeeze at the bottom of the movement. Return slowly under control — feel the stretch in your abs at the top. The machine isolates the rectus abdominis without straining your neck or lower back."
 };
 
 // ╔═════════════════════════════════════════════════════════════════════════╗
@@ -2029,6 +2113,176 @@ function saveMealEdit() {
   renderNutritionDay();
 }
 
+// ╔═════════════════════════════════════════════════════════════════════════╗
+// ║  CLIENT-SIDE MEAL LOGGING                                               ║
+// ║  Client taps ✓ ATE / ⚠ SWAP / ✗ SKIP on each meal. Logs locally to      ║
+// ║  localStorage AND pushes to the coach dashboard via webhook.            ║
+// ║  Daily ACTUALS row at bottom of nutrition view computed from logs.      ║
+// ╚═════════════════════════════════════════════════════════════════════════╝
+
+function _mealLogKey() { return CLIENT_CONFIG.client.storageKey + '_meal_log'; }
+
+function loadMealLogs() {
+  try { return JSON.parse(localStorage.getItem(_mealLogKey()) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function _mealLogId(week, dayIdx, mealIdx) {
+  return 'w' + week + '.d' + dayIdx + '.m' + mealIdx;
+}
+
+function getMealLogEntry(week, dayIdx, mealIdx) {
+  return loadMealLogs()[_mealLogId(week, dayIdx, mealIdx)] || null;
+}
+
+function saveMealLogLocal(logs) {
+  localStorage.setItem(_mealLogKey(), JSON.stringify(logs));
+}
+
+function postMealLog(entry) {
+  if (!CLIENT_CONFIG.sheetsWebhookUrl) {
+    showSyncMsg('saved locally (no cloud)', 'warn');
+    return;
+  }
+  fetch(CLIENT_CONFIG.sheetsWebhookUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      type: 'meal',
+      client: CLIENT_CONFIG.client.storageKey,
+      week:   entry.week,
+      dayIdx: entry.dayIdx,
+      mealIdx:entry.mealIdx,
+      mealName: entry.mealName,
+      status: entry.status,
+      swapDesc: entry.swapDesc || '',
+      calActual: entry.cal || 0,
+      pActual: entry.p || 0,
+      cActual: entry.c || 0,
+      fActual: entry.f || 0,
+      timestamp: new Date().toISOString(),
+    })
+  }).then(() => {
+    showSyncMsg('✓ logged', 'ok');
+    if (typeof _lastSyncMs !== 'undefined') {
+      _lastSyncMs = Date.now();
+      _lastSyncStatus = 'ok';
+      updateSyncBadge();
+    }
+  }).catch(e => {
+    console.warn('Meal log POST failed:', e);
+    showSyncMsg('✗ log sync failed', 'err');
+  });
+}
+
+function logMealQuick(week, dayIdx, mealIdx, status) {
+  // status = 'ate' | 'skip'   (swap uses logMealSwap)
+  const meals = getMealDay(week, dayIdx);
+  const meal = meals[mealIdx];
+  if (!meal) return;
+  const logs = loadMealLogs();
+  const id = _mealLogId(week, dayIdx, mealIdx);
+  const entry = {
+    week, dayIdx, mealIdx,
+    mealName: meal.name,
+    status,
+    cal: status === 'ate' ? (meal.cal || 0) : 0,
+    p:   status === 'ate' ? (meal.p   || 0) : 0,
+    c:   status === 'ate' ? (meal.c   || 0) : 0,
+    f:   status === 'ate' ? (meal.f   || 0) : 0,
+    ts:  new Date().toISOString(),
+  };
+  logs[id] = entry;
+  saveMealLogLocal(logs);
+  postMealLog(entry);
+  renderNutritionDay();
+}
+
+function unlogMeal(week, dayIdx, mealIdx) {
+  const logs = loadMealLogs();
+  const id = _mealLogId(week, dayIdx, mealIdx);
+  delete logs[id];
+  saveMealLogLocal(logs);
+  // Push a "delete" status — coach dashboard ignores rows without status
+  postMealLog({ week, dayIdx, mealIdx, mealName: '', status: 'undo' });
+  renderNutritionDay();
+}
+
+// ─── Swap modal ───
+let _swapCtx = null;
+function openSwapModal(week, dayIdx, mealIdx) {
+  _swapCtx = { week, dayIdx, mealIdx };
+  const meal = getMealDay(week, dayIdx)[mealIdx] || {};
+  document.getElementById('swap-modal-title').textContent =
+    'Swapped: ' + (meal.name || 'meal') + ' — what did you eat?';
+  document.getElementById('sw-desc').value = '';
+  document.getElementById('sw-cal').value = '';
+  document.getElementById('sw-p').value = '';
+  document.getElementById('sw-c').value = '';
+  document.getElementById('sw-f').value = '';
+  document.getElementById('swap-modal-overlay').classList.add('open');
+}
+function cancelSwap() { document.getElementById('swap-modal-overlay').classList.remove('open'); }
+function closeSwapModal(e) {
+  if (e.target === document.getElementById('swap-modal-overlay')) cancelSwap();
+}
+function saveSwap() {
+  if (!_swapCtx) return;
+  const desc = document.getElementById('sw-desc').value.trim();
+  if (!desc) { alert('Describe what you ate.'); return; }
+  const cal = parseInt(document.getElementById('sw-cal').value) || 0;
+  const p   = parseInt(document.getElementById('sw-p').value)   || 0;
+  const c   = parseInt(document.getElementById('sw-c').value)   || 0;
+  const f   = parseInt(document.getElementById('sw-f').value)   || 0;
+
+  const meals = getMealDay(_swapCtx.week, _swapCtx.dayIdx);
+  const meal = meals[_swapCtx.mealIdx] || {};
+  // If user left cal blank but plan has a cal, assume similar — use 80% of planned as fallback
+  // This way actuals aren't zero just because they didn't track exact macros
+  const finalCal = cal || Math.round((meal.cal || 0) * 0.8);
+  const finalP   = p   || Math.round((meal.p   || 0) * 0.8);
+  const finalC   = c   || Math.round((meal.c   || 0) * 0.8);
+  const finalF   = f   || Math.round((meal.f   || 0) * 0.8);
+
+  const logs = loadMealLogs();
+  const id = _mealLogId(_swapCtx.week, _swapCtx.dayIdx, _swapCtx.mealIdx);
+  const entry = {
+    week: _swapCtx.week, dayIdx: _swapCtx.dayIdx, mealIdx: _swapCtx.mealIdx,
+    mealName: meal.name,
+    status: 'swap',
+    swapDesc: desc,
+    cal: finalCal, p: finalP, c: finalC, f: finalF,
+    ts: new Date().toISOString(),
+  };
+  logs[id] = entry;
+  saveMealLogLocal(logs);
+  postMealLog(entry);
+  cancelSwap();
+  renderNutritionDay();
+}
+
+// ─── Daily actuals from log ───
+function computeDailyActuals(week, dayIdx) {
+  const meals = getMealDay(week, dayIdx);
+  const logs = loadMealLogs();
+  let cal=0, p=0, c=0, f=0, logged=0, planned=0;
+  meals.forEach((m, mIdx) => {
+    if (!m.name) return;
+    planned++;
+    const id = _mealLogId(week, dayIdx, mIdx);
+    const log = logs[id];
+    if (log && log.status) {
+      logged++;
+      cal += log.cal || 0;
+      p   += log.p   || 0;
+      c   += log.c   || 0;
+      f   += log.f   || 0;
+    }
+  });
+  return { cal, p, c, f, logged, planned };
+}
+
 // ─── Edit UI ───
 let _editingIdx = -1;
 let _editingIsNew = false;
@@ -2611,16 +2865,54 @@ function renderNutritionDayContent(){
   const mealRows=meals.map((meal,mIdx)=>{
     if(!meal.name) return '';
     const pencil = trainerMode ? `<button class="meal-edit-pencil" onclick="editMeal(${currentNutritionWeek},${currentNutritionDay},${mIdx})">✏️ EDIT</button>` : '';
-    if(!meal.cal)return`<div style="position:relative;background:rgba(0,229,160,0.05);border:1px dashed rgba(0,229,160,0.3);border-radius:10px;padding:1rem 1.5rem;text-align:center;font-size:0.85rem;color:var(--accent3);">🍳 ${meal.name} — ${meal.desc}${pencil}</div>`;
+    // Client-mode logging UI (only show in non-trainer mode)
+    let logUI = '';
+    if (!trainerMode) {
+      const logEntry = getMealLogEntry(currentNutritionWeek, currentNutritionDay, mIdx);
+      if (logEntry && logEntry.status) {
+        const label = logEntry.status === 'ate' ? '✓ ATE' : logEntry.status === 'swap' ? '⚠ SWAPPED' : '✗ SKIPPED';
+        const sub = logEntry.swapDesc ? ` — ${logEntry.swapDesc}` : '';
+        logUI = `<div class="meal-log-row"><span class="meal-log-status ${logEntry.status}">${label}${sub}<span class="undo" onclick="unlogMeal(${currentNutritionWeek},${currentNutritionDay},${mIdx})">undo</span></span></div>`;
+      } else {
+        logUI = `<div class="meal-log-row">
+          <button class="meal-log-btn ate-btn"  onclick="logMealQuick(${currentNutritionWeek},${currentNutritionDay},${mIdx},'ate')">✓ Ate it</button>
+          <button class="meal-log-btn swap-btn" onclick="openSwapModal(${currentNutritionWeek},${currentNutritionDay},${mIdx})">⚠ Swapped</button>
+          <button class="meal-log-btn skip-btn" onclick="logMealQuick(${currentNutritionWeek},${currentNutritionDay},${mIdx},'skip')">✗ Skipped</button>
+        </div>`;
+      }
+    }
+    if(!meal.cal)return`<div style="position:relative;background:rgba(0,229,160,0.05);border:1px dashed rgba(0,229,160,0.3);border-radius:10px;padding:1rem 1.5rem;text-align:center;font-size:0.85rem;color:var(--accent3);">🍳 ${meal.name} — ${meal.desc}${pencil}${logUI}</div>`;
     return`<div class="meal-card" style="position:relative;grid-template-columns:140px 1fr 52px 52px 60px;">
       ${pencil}
       <div><div class="meal-time">${meal.time}</div><div style="font-size:0.8rem;font-weight:500;color:var(--text);margin-top:0.2rem;">${meal.name}</div></div>
-      <div class="meal-food">${meal.desc}</div>
+      <div class="meal-food">${meal.desc}${logUI}</div>
       <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--accent);font-weight:600;">${meal.p}g</div><div style="font-size:0.6rem;color:var(--muted)">PRO</div></div>
       <div style="text-align:center"><div style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--accent2);font-weight:600;">${meal.c}g</div><div style="font-size:0.6rem;color:var(--muted)">CARB</div></div>
       <div style="text-align:center"><div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--accent3);line-height:1;">${meal.cal}</div><div style="font-size:0.6rem;color:var(--muted)">kcal</div></div>
     </div>`;
   }).join('');
+
+  // Compute daily actuals from client meal logs (only show in non-trainer mode)
+  let actualsCard = '';
+  if (!trainerMode) {
+    const a = computeDailyActuals(currentNutritionWeek, currentNutritionDay);
+    const completePct = a.planned ? Math.round((a.logged / a.planned) * 100) : 0;
+    const calPctActual = a.cal ? Math.min(100, Math.round((a.cal / t.cal) * 100)) : 0;
+    const pPctActual = a.p ? Math.min(100, Math.round((a.p / t.p) * 100)) : 0;
+    actualsCard = `
+      <div class="actuals-card ${completePct === 100 ? 'complete' : ''}">
+        <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:0.75rem;">
+          MY ACTUAL TODAY · ${a.logged}/${a.planned} meals logged ${completePct === 100 ? '· ✓ COMPLETE' : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;">
+          <div><div style="font-size:0.65rem;color:var(--muted);">Calories</div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:${calPctActual>=90?'var(--accent3)':'var(--accent)'};">${a.cal}</div><div style="font-size:0.65rem;color:var(--muted);">vs ${t.cal} target · ${calPctActual}%</div></div>
+          <div><div style="font-size:0.65rem;color:var(--muted);">Protein</div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:${pPctActual>=90?'var(--accent3)':'var(--accent)'};">${a.p}g</div><div style="font-size:0.65rem;color:var(--muted);">vs ${t.p}g · ${pPctActual}%</div></div>
+          <div><div style="font-size:0.65rem;color:var(--muted);">Carbs</div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--accent2);">${a.c}g</div><div style="font-size:0.65rem;color:var(--muted);">vs ${t.c}g</div></div>
+          <div><div style="font-size:0.65rem;color:var(--muted);">Fat</div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--accent3);">${a.f}g</div><div style="font-size:0.65rem;color:var(--muted);">vs ${t.f}g</div></div>
+        </div>
+      </div>
+    `;
+  }
   const dayResetBtn = (trainerMode && dayEdited) ? `<button class="trainer-reset-btn" onclick="resetMealDay(${currentNutritionWeek},${currentNutritionDay})" style="margin-top:0.5rem;">↶ Reset This Day's Meals</button>` : '';
   const dayEditedBadge = dayEdited ? '<span class="trainer-edited-badge">EDITED</span>' : '';
   document.getElementById('nutrition-day-content').innerHTML=`
@@ -2643,7 +2935,8 @@ function renderNutritionDayContent(){
         <div style="width:${calPct}%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:20px;transition:width 0.4s;"></div>
       </div>
       <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem;">${calPct}% of daily calorie target</div>
-    </div>`;
+    </div>
+    ${actualsCard}`;
 }
 
 // ─── NAV LOCK ─────────────────────────────────────────────────────────────────
